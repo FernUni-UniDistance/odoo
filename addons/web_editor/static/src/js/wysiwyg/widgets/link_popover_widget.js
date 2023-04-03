@@ -23,6 +23,7 @@ const LinkPopoverWidget = Widget.extend({
         this.options = options;
         this.target = target;
         this.$target = $(target);
+        this.container = this.options.container || this.target.ownerDocument.body;
         this.href = this.$target.attr('href'); // for template
         this._dp = new DropPrevious();
     },
@@ -38,7 +39,15 @@ const LinkPopoverWidget = Widget.extend({
         this.$fullUrl = this.$('.o_we_full_url');
 
         // Copy onclick handler
-        const clipboard = new ClipboardJS(
+        // ClipboardJS uses "instanceof" to verify the elements passed to its
+        // constructor. Unfortunately, when the element is within an iframe,
+        // instanceof is not behaving the same across all browsers.
+        const containerWindow = this.container.ownerDocument.defaultView;
+        let _ClipboardJS = ClipboardJS;
+        if (this.$copyLink[0] instanceof containerWindow.HTMLElement) {
+            _ClipboardJS = containerWindow.ClipboardJS;
+        }
+        const clipboard = new _ClipboardJS(
             this.$copyLink[0],
             {text: () => this.target.href} // Absolute href
         );
