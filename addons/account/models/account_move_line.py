@@ -1802,9 +1802,9 @@ class AccountMoveLine(models.Model):
         query_str, query_param = query.select()
         self.env.cr.execute(f"""
             SELECT account.root_id
-              FROM account_account account,
-                   LATERAL ({query_str}) line
-             WHERE account.company_id IN %s
+            FROM account_account account
+            WHERE EXISTS ({query_str})
+            AND account.company_id IN %s
         """, query_param + [tuple(self.env.companies.ids)])
         return {
             root.id: {'id': root.id, 'display_name': root.display_name}
