@@ -230,16 +230,67 @@ odoo_mailgate: "|/path/to/odoo-mailgate.py --host=localhost -u %(uid)d -p PASSWO
                     imap_server = server.connect()
                     imap_server.select()
                     result, data = imap_server.search(None, '(UNSEEN)')
+                    _logger.info(f"FETCHMAIL DEBUG: server {server.name}, result {result}, data {data}")
                     for num in data[0].split():
+                        _logger.info(
+                            "FETCHMAIL DEBUG: server=%s starting IMAP message num=%s",
+                            server.name,
+                            num,
+                        )
                         res_id = None
-                        result, data = imap_server.fetch(num, '(RFC822)')
-                        imap_server.store(num, '-FLAGS', '\\Seen')
                         try:
-                            res_id = MailThread.with_context(**additionnal_context).message_process(server.object_id.model, data[0][1], save_original=server.original, strip_attachments=(not server.attach))
+                            flags_result, flags_data = imap_server.fetch(num, '(FLAGS)')
+                            _logger.info(
+                                "FETCHMAIL DEBUG: BEFORE fetch server=%s msg_num=%s flags=%s",
+                                server.name,
+                                num,
+                                flags_data,
+                            )
                         except Exception:
-                            _logger.info('Failed to process mail from %s server %s.', server.server_type, server.name, exc_info=True)
+                            _logger.exception("FETCHMAIL DEBUG: could not read flags before fetch")
+                        result, data = imap_server.fetch(num, '(BODY.PEEK[])')
+                        try:
+                            flags_result, flags_data = imap_server.fetch(num, '(FLAGS)')
+                            _logger.info(
+                                "FETCHMAIL DEBUG: AFTER fetch server=%s msg_num=%s flags=%s",
+                                server.name,
+                                num,
+                                flags_data,
+                            )
+                        except Exception:
+                            _logger.exception("FETCHMAIL DEBUG: could not read flags after fetch")
+                        imap_server.store(num, '-FLAGS', '\\Seen')
+                        success = False
+                        try:
+                            res_id = MailThread.with_context(**additionnal_context).message_process(server.object_id.model, data[0][1], save_original=server.original, strip_attachments=(not server.attach))                            
+                            success = True
+                        except Exception:                      
+                            _logger.exception(
+                                "Failed to process mail from %s server %s msg_num=%s.",
+                                server.server_type,
+                                server.name,
+                                num,
+                            )
                             failed += 1
-                        imap_server.store(num, '+FLAGS', '\\Seen')
+                        if success:
+                            imap_server.store(num, '+FLAGS', '\\Seen')
+                        else:
+                            imap_server.store(num, '-FLAGS', '\\Seen')
+                        try:
+                            flags_result_final, flags_data_final = imap_server.fetch(num, '(FLAGS)')
+                            _logger.info(
+                                "FETCHMAIL DEBUG: FINAL flags server=%s msg_num=%s success=%s flags=%s",
+                                server.name,
+                                num,
+                                success,
+                                flags_data_final,
+                            )
+                        except Exception:
+                            _logger.exception(
+                                "FETCHMAIL DEBUG: could not read final flags after +Seen server=%s msg_num=%s",
+                                server.name,
+                                num,
+                            )
                         self._cr.commit()
                         count += 1
                     _logger.info("Fetched %d email(s) on %s server %s; %d succeeded, %d failed.", count, server.server_type, server.name, (count - failed), failed)
