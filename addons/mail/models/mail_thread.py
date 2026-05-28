@@ -1382,11 +1382,6 @@ class MailThread(models.AbstractModel):
         # extract message bytes - we are forced to pass the message as binary because
         # we don't know its encoding until we parse its headers and hence can't
         # convert it to utf-8 for transport between the mailgate script and here.
-        _logger.info(
-            "MAIL DEBUG: entered message_process model=%s message_type=%s",
-            model,
-            type(message),
-        )
         if isinstance(message, xmlrpclib.Binary):
             message = bytes(message.data)
         if isinstance(message, str):
@@ -1395,14 +1390,6 @@ class MailThread(models.AbstractModel):
 
         # parse the message, verify we are not in a loop by checking message_id is not duplicated
         msg_dict = self.message_parse(message, save_original=save_original)
-        _logger.info(
-            "MAIL DEBUG: parsed message Message-Id=%s From=%s To=%s Cc=%s Subject=%s",
-            msg_dict.get('message_id') or msg_dict.get('Message-Id'),
-            msg_dict.get('email_from') or msg_dict.get('from'),
-            msg_dict.get('to'),
-            msg_dict.get('cc'),
-            msg_dict.get('subject'),
-        )
         if strip_attachments:
             msg_dict.pop('attachments', None)
 
@@ -1426,11 +1413,6 @@ class MailThread(models.AbstractModel):
 
         # find possible routes for the message; note this also updates notably
         # 'author_id' of msg_dict
-        _logger.info(
-            "MAIL DEBUG: before message_route model=%s Message-Id=%s",
-            model,
-            msg_dict.get('message_id') or msg_dict.get('Message-Id'),
-        )
         routes = self.message_route(message, msg_dict, model, thread_id, custom_values)
         if self._detect_loop_sender(message, msg_dict, routes):
             return
